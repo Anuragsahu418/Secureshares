@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import cloudinary from "../../../lib/cloudinary";
+import { getCloudinary } from "../../../lib/cloudinary";
 import { connectDB } from "../../../lib/db";
 import FileModel from "../../../models/File";
 import bcrypt from "bcryptjs";
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     const uploadResult: UploadApiResponse = await new Promise(
       (resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
+        const stream = getCloudinary().uploader.upload_stream(
           { folder: "secureshare", resource_type: "auto" },
           (error, result) => {
             if (error) reject(error);
