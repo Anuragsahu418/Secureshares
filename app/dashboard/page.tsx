@@ -5,12 +5,20 @@ import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
-  const [password, setPassword] = useState("");
   const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [inputKey, setInputKey] = useState(0);
   const router = useRouter();
+
+  const b64UrlEncode = (bytes: Uint8Array) =>
+    btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+
+  const toArrayBuffer = (bytes: Uint8Array) =>
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -29,9 +37,33 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
+      const keyBytes = crypto.getRandomValues(new Uint8Array(32));
+      const ivBytes = crypto.getRandomValues(new Uint8Array(12));
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        toArrayBuffer(keyBytes),
+        { name: "AES-GCM" },
+        false,
+        ["encrypt"]
+      );
+
+      const encryptedBuffer = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: ivBytes },
+        cryptoKey,
+        await file.arrayBuffer()
+      );
+
+      const encryptedFile = new File(
+        [new Uint8Array(encryptedBuffer)],
+        "payload",
+        { type: "application/octet-stream" }
+      );
+
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("password", password);
+      formData.append("file", encryptedFile);
+      formData.append("filename", file.name);
+      formData.append("contentType", file.type || "application/octet-stream");
+      formData.append("iv", b64UrlEncode(ivBytes));
 
       const token = localStorage.getItem("token");
       if (!token) {
@@ -56,9 +88,9 @@ export default function Dashboard() {
           setError("Upload succeeded but link could not be generated.");
           return;
         }
-        const generatedLink = `${window.location.origin}/file/${id}`;
+        const key = b64UrlEncode(keyBytes);
+        const generatedLink = `${window.location.origin}/file/${id}#key=${key}`;
         setLink(generatedLink);
-        setPassword("");
         setFile(null);
         setInputKey((prev) => prev + 1);
       } else {
@@ -91,8 +123,8 @@ export default function Dashboard() {
               SecureShare Dashboard
             </h1>
             <p className="text-sm text-green-200/70">
-              Upload a file, add optional password protection, and generate a
-              secure share link.
+              Files are encrypted in your browser. Only someone with the full
+              link can decrypt and download.
             </p>
           </div>
           <button onClick={handleLogout} className="btn btn-ghost">
@@ -110,20 +142,6 @@ export default function Dashboard() {
               setFile(e.target.files ? e.target.files[0] : null)
             }
           />
-
-          <div className="flex flex-col gap-2">
-            <label className="label" htmlFor="password">
-              Optional password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Add a passphrase"
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
 
           {error && (
             <p className="text-sm text-red-300" role="alert">
@@ -147,7 +165,7 @@ export default function Dashboard() {
             Secure share link generated
           </p>
           <p className="mt-1 text-sm text-green-200/70">
-            Send this link to your recipient.
+            This link contains the decryption key. Store it safely.
           </p>
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-center">

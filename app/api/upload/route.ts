@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getCloudinary } from "../../../lib/cloudinary";
 import { connectDB } from "../../../lib/db";
 import FileModel from "../../../models/File";
-import bcrypt from "bcryptjs";
 import { UploadApiResponse } from "cloudinary";
 import { getAuthPayload } from "../../../lib/auth";
 
@@ -20,12 +19,29 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
-    const passwordValue = formData.get("password");
-    const password = typeof passwordValue === "string" ? passwordValue : "";
+    const filenameValue = formData.get("filename");
+    const filename =
+      typeof filenameValue === "string" && filenameValue.trim()
+        ? filenameValue.trim()
+        : "secure-file";
+    const ivValue = formData.get("iv");
+    const iv = typeof ivValue === "string" ? ivValue : "";
+    const contentTypeValue = formData.get("contentType");
+    const contentType =
+      typeof contentTypeValue === "string" && contentTypeValue.trim()
+        ? contentTypeValue.trim()
+        : "application/octet-stream";
 
     if (!file || typeof file.arrayBuffer !== "function") {
       return NextResponse.json(
         { message: "No file uploaded" },
+        { status: 400 }
+      );
+    }
+
+    if (!iv) {
+      return NextResponse.json(
+        { message: "Missing encryption metadata." },
         { status: 400 }
       );
     }
@@ -44,7 +60,7 @@ export async function POST(req: Request) {
     const uploadResult: UploadApiResponse = await new Promise(
       (resolve, reject) => {
         const stream = getCloudinary().uploader.upload_stream(
-          { folder: "secureshare", resource_type: "auto" },
+          { folder: "secureshare", resource_type: "raw" },
           (error, result) => {
             if (error) reject(error);
             else if (result) resolve(result);
@@ -56,19 +72,13 @@ export async function POST(req: Request) {
       }
     );
 
-    let hashedPassword = "";
-
-    if (password && password.trim() !== "") {
-      hashedPassword = await bcrypt.hash(password, 10);
-    }
-
     const savedFile = await FileModel.create({
-      filename: uploadResult.original_filename,
+      filename,
       url: uploadResult.secure_url,
       ownerId: auth.id,
-      password: hashedPassword,
+      iv,
       size: file.size,
-      contentType: file.type,
+      contentType,
     });
 
     return NextResponse.json({

@@ -26,7 +26,6 @@ export default async function FilePage({
     );
   }
 
-  const isProtected = Boolean(file.password);
   const fileId = file._id.toString();
 
   return (
@@ -37,14 +36,12 @@ export default async function FilePage({
           {file.filename}
         </h1>
         <p className="mt-2 text-sm text-green-200/70">
-          {isProtected
-            ? "This file is protected by a password."
-            : "This file can be downloaded without a password."}
+          This file is end-to-end encrypted. You need the link key to decrypt
+          it locally.
         </p>
 
         <DownloadPanel
           fileId={fileId}
-          isProtected={isProtected}
           initialDownloads={file.downloadCount || 0}
         />
       </div>

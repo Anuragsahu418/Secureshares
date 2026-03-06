@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { connectDB } from "../../../../../lib/db";
 import FileModel from "../../../../../models/File";
 
@@ -10,10 +9,6 @@ export async function POST(
   try {
     await connectDB();
     const { id } = await params;
-    const body = await req.json().catch(() => ({}));
-    const password =
-      typeof body.password === "string" ? body.password.trim() : "";
-
     const file = await FileModel.findById(id);
     if (!file) {
       return NextResponse.json(
@@ -22,21 +17,11 @@ export async function POST(
       );
     }
 
-    if (file.password && file.password !== "") {
-      if (!password) {
-        return NextResponse.json(
-          { message: "Password is required" },
-          { status: 401 }
-        );
-      }
-
-      const isMatch = await bcrypt.compare(password, file.password);
-      if (!isMatch) {
-        return NextResponse.json(
-          { message: "Invalid password" },
-          { status: 401 }
-        );
-      }
+    if (!file.iv) {
+      return NextResponse.json(
+        { message: "Missing encryption metadata." },
+        { status: 400 }
+      );
     }
 
     const updated = await FileModel.findByIdAndUpdate(
@@ -48,6 +33,8 @@ export async function POST(
     return NextResponse.json({
       url: file.url,
       filename: file.filename,
+      iv: file.iv,
+      contentType: file.contentType || "application/octet-stream",
       downloadCount: updated?.downloadCount ?? file.downloadCount + 1,
     });
   } catch (error) {

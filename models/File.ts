@@ -5,7 +5,8 @@ const FileSchema = new mongoose.Schema(
     filename: { type: String, required: true },
     url: { type: String, required: true },
     ownerId: { type: String, required: true, index: true },
-    password: String, // password hash (optional)
+    password: String, // legacy (unused with client-side encryption)
+    iv: { type: String, required: true },
     size: Number,
     contentType: String,
     downloadCount: { type: Number, default: 0 },

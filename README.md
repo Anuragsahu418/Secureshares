@@ -1,11 +1,11 @@
 # SecureShare
 
 SecureShare is a minimal, production-minded file sharing app built with Next.js.
-Upload a file, optionally protect it with a password, and share a secure link.
+Upload a file, encrypt it in the browser, and share a secure link.
 
 ## Features
 - Encrypted uploads to Cloudinary
-- Optional password protection per file
+- Client-side encryption (zero-knowledge)
 - Auth-required dashboard access
 - Download tracking on verified requests
 
@@ -36,4 +36,5 @@ Open `http://localhost:3000`.
 
 ## Notes
 - Upload size is capped at 20MB per file.
-- Password-protected files require the password before download.
+- The decryption key lives in the link fragment (`#key=`). It is never sent to the server.
+- If the link is lost, the file cannot be decrypted.
